@@ -41,7 +41,7 @@ from milc import cli
 try:
   from english_words import english_words_lower_alpha_set as CORRECT_WORDS
 except ImportError:
-  print('Autocorrection will falsely trigger when a typo is a substring of a '
+  cli.log.info('Autocorrection will falsely trigger when a typo is a substring of a '
         'correctly spelled word. To check for this, install the english_words '
         'package and rerun this script:\n\n  pip install english_words\n')
   # Use a minimal word list as a fallback.
@@ -74,7 +74,7 @@ def parse_file(file_name: str) -> List[Tuple[str, str]]:
       # Parse syntax "typo -> correction", using strip to ignore indenting.
       tokens = [token.strip() for token in line.split('->', 1)]
       if len(tokens) != 2 or not tokens[0]:
-        print(f'Error:{line_number}: Invalid syntax: "{line}"')
+        cli.log.error(f'Error:%d: Invalid syntax: "%s"', line_number, line)
         sys.exit(1)
 
       typo, correction = tokens
@@ -82,43 +82,43 @@ def parse_file(file_name: str) -> List[Tuple[str, str]]:
       typo = typo.replace(' ', ':')
 
       if typo in typos:
-        print(f'Warning:{line_number}: Ignoring duplicate typo: "{typo}"')
+        cli.log.warning(f'Warning:%d: Ignoring duplicate typo: "%s"', line_number, typo)
         continue
 
       # Check that `typo` is valid.
       if not(all([ord('a') <= ord(c) <= ord('z') or c == ':' for c in typo])):
-        print(f'Error:{line_number}: Typo "{typo}" has '
-              'characters other than a-z and :.')
+        cli.log.error(f'Error:%d: Typo "%s" has '
+              'characters other than a-z and :.', line_number, typo)
         sys.exit(1)
       for other_typo in typos:
         if typo in other_typo or other_typo in typo:
-          print(f'Error:{line_number}: Typos may not be substrings of one '
+          cli.log.error(f'Error:%d: Typos may not be substrings of one '
                 f'another, otherwise the longer typo would never trigger: '
-                f'"{typo}" vs. "{other_typo}".')
+                f'"%s" vs. "%s".', line_number, typo, other_typo)
           sys.exit(1)
       if len(typo) < 5:
-        print(f'Warning:{line_number}: It is suggested that typos are at '
-              f'least 5 characters long to avoid false triggers: "{typo}"')
+        cli.log.warning(f'Warning:%d: It is suggested that typos are at '
+              f'least 5 characters long to avoid false triggers: "%s"', line_number, typo)
 
       if typo.startswith(':') and typo.endswith(':'):
         if typo[1:-1] in CORRECT_WORDS:
-          print(f'Warning:{line_number}: Typo "{typo}" is a correctly spelled '
-                'dictionary word.')
+          cli.log.warning(f'Warning:%d: Typo "%s" is a correctly spelled '
+                'dictionary word.', line_number, typo)
       elif typo.startswith(':') and not typo.endswith(':'):
         for word in CORRECT_WORDS:
           if word.startswith(typo[1:]):
-            print(f'Warning:{line_number}: Typo "{typo}" would falsely trigger '
-                  f'on correctly spelled word "{word}".')
+            cli.log.warning(f'Warning:%d: Typo "%s" would falsely trigger '
+                  f'on correctly spelled word "%s".', line_number, typo, word)
       elif not typo.startswith(':') and typo.endswith(':'):
         for word in CORRECT_WORDS:
           if word.endswith(typo[:-1]):
-            print(f'Warning:{line_number}: Typo "{typo}" would falsely trigger '
-                  f'on correctly spelled word "{word}".')
+            cli.log.warning(f'Warning:%d: Typo "%s" would falsely trigger '
+                  f'on correctly spelled word "%s".', line_number, typo, word)
       elif not typo.startswith(':') and not typo.endswith(':'):
         for word in CORRECT_WORDS:
           if typo in word:
-            print(f'Warning:{line_number}: Typo "{typo}" would falsely trigger '
-                  f'on correctly spelled word "{word}".')
+            cli.log.warning(f'Warning:%d: Typo "%s" would falsely trigger '
+                  f'on correctly spelled word "%s".', line_number, typo, word)
 
       autocorrections.append((typo, correction))
       typos.add(typo)
@@ -253,8 +253,7 @@ def write_generated_code(autocorrections: List[Tuple[str, str]],
 @cli.argument('input', default='autocorrection_dict.txt', help='The input file')
 @cli.subcommand('Generate the autocorrection data file from a dictionary file.')
 def make_autocorrect_data(cli):
-  dict_file = cli.args.input or 'autocorrection_dict.txt'
-  autocorrections = parse_file(dict_file)
+  autocorrections = parse_file(cli.args.input)
   trie = make_trie(autocorrections)
   data = serialize_trie(autocorrections, trie)
   cli.log.info(f'Processed %d autocorrection entries to table with %d bytes.',
