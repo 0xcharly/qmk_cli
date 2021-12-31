@@ -5,4 +5,5 @@ We list each subcommand here explicitly because all the reliable ways of searchi
 from . import clone  # noqa
 from . import console  # noqa
 from . import env  # noqa
+from . import make_autocorrect_data  # noqa
 from . import setup  # noqa
